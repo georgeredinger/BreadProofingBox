@@ -64,11 +64,11 @@ void setup()
 }
   
 boolean isNewMinute(){
-  static long lastMinute=0;
-  long thisMinute = millis()/6000L;
+  static long lastMilli=0;
+  long thisMilli = millis();
   
-  if(minute>=lastMinute){
-      lastMinute=thisMinute;
+  if(thisMilli>lastMilli+60000L){
+      lastMilli=thisMilli;
       return true;
   }else{
     return false;
