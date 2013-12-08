@@ -1,6 +1,12 @@
 //Sample using LiquidCrystal library
 #include <LiquidCrystal.h>
- 
+ #include <OneWire.h> 
+
+int DS18S20_Pin = 2; //DS18S20 Signal pin on digital 2
+
+//Temperature chip i/o
+OneWire ds(DS18S20_Pin);  // on digital pin 2
+
 /*******************************************************
  
 This program will test the LCD panel and the buttons
@@ -10,7 +16,7 @@ Mark Bramwell, July 2010
  
 // select the pins used on the LCD panel
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
- 
+long seconds; 
 // define some values used by the panel and buttons
 int lcd_key     = 0;
 int adc_key_in  = 0;
@@ -50,15 +56,34 @@ int read_LCD_buttons()
  
 void setup()
 {
+ Serial.begin(9600);
  lcd.begin(16, 2);              // start the library
  lcd.setCursor(0,0);
- lcd.print("Push the buttons"); // print a simple message
+ pinMode(12,OUTPUT);
+ digitalWrite(12,LOW);
+}
+  
+boolean isNewMinute(){
+  static boolean newMinute = false;
+  int seconds = millis()/1000;
+  if((seconds % 60 == 0) && ! newMinute){
+    newMinute=true;
+  }else{
+    newMinute = false;
+  }
+  return newMinute;
 }
   
 void loop()
 {
+  float temperature = getTemp()*1.8+32.0;
+  seconds=millis()/1000L;
+   if(isNewMinute()){
+       Serial.print(seconds/60);
+       Serial.print(",");
+       Serial.println(temperature);
+   }
  lcd.setCursor(9,1);            // move cursor to second line "1" and 9 spaces over
- lcd.print(millis()/1000);      // display seconds elapsed since power-up
  
  
  lcd.setCursor(0,1);            // move to the begining of the second line
@@ -69,11 +94,13 @@ void loop()
    case btnRIGHT:
      {
      lcd.print("RIGHT ");
+     digitalWrite(12,LOW);
      break;
      }
    case btnLEFT:
      {
      lcd.print("LEFT   ");
+     digitalWrite(12,HIGH);
      break;
      }
    case btnUP:
@@ -93,9 +120,65 @@ void loop()
      }
      case btnNONE:
      {
-     lcd.print("NONE  ");
      break;
      }
  }
  
+ if(temperature > 100.0)
+   digitalWrite(12,LOW);
+  else
+   digitalWrite(12,HIGH);
+
+  lcd.setCursor(0,0);
+  lcd.print(seconds/60);
+  lcd.print(" ");
+  lcd.print(temperature);
+}
+
+
+float getTemp(){
+  //returns the temperature from one DS18S20 in DEG Celsius
+
+  byte data[12];
+  byte addr[8];
+
+  if ( !ds.search(addr)) {
+      //no more sensors on chain, reset search
+      ds.reset_search();
+      return -1000;
+  }
+
+  if ( OneWire::crc8( addr, 7) != addr[7]) {
+      Serial.println("CRC is not valid!");
+      return -1000;
+  }
+
+  if ( addr[0] != 0x10 && addr[0] != 0x28) {
+      Serial.print("Device is not recognized");
+      return -1000;
+  }
+
+  ds.reset();
+  ds.select(addr);
+  ds.write(0x44,1); // start conversion, with parasite power on at the end
+
+  byte present = ds.reset();
+  ds.select(addr);    
+  ds.write(0xBE); // Read Scratchpad
+
+  
+  for (int i = 0; i < 9; i++) { // we need 9 bytes
+    data[i] = ds.read();
+  }
+  
+  ds.reset_search();
+  
+  byte MSB = data[1];
+  byte LSB = data[0];
+
+  float tempRead = ((MSB << 8) | LSB); //using two's compliment
+  float TemperatureSum = tempRead / 16;
+  
+  return TemperatureSum;
+  
 }
