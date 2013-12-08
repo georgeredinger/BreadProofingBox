@@ -64,14 +64,15 @@ void setup()
 }
   
 boolean isNewMinute(){
-  static boolean newMinute = false;
-  int seconds = millis()/1000;
-  if((seconds % 60 == 0) && ! newMinute){
-    newMinute=true;
+  static long lastMinute=0;
+  long thisMinute = millis()/6000L;
+  
+  if(minute>=lastMinute){
+      lastMinute=thisMinute;
+      return true;
   }else{
-    newMinute = false;
+    return false;
   }
-  return newMinute;
 }
   
 void loop()
